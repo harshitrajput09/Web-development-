@@ -1,0 +1,85 @@
+from flask import Flask, render_template_string, request, redirect, session, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key'  # Required for session management
+
+# Simulated user database (you can replace with SQLite later)
+users_db = {}
+
+# Templates as strings for simplicity
+register_page = '''
+<h2>Register</h2>
+<form method="post">
+  Username: <input name="username" required><br>
+  Password: <input type="password" name="password" required><br>
+  <button type="submit">Register</button>
+</form>
+<a href="/login">Already have an account?</a>
+'''
+
+login_page = '''
+<h2>Login</h2>
+<form method="post">
+  Username: <input name="username" required><br>
+  Password: <input type="password" name="password" required><br>
+  <button type="submit">Login</button>
+</form>
+<a href="/register">Don't have an account?</a>
+'''
+
+dashboard_page = '''
+<h2>Welcome {{ user }}!</h2>
+<p>This is a protected page.</p>
+<a href="/logout">Logout</a>
+'''
+
+@app.route('/')
+def home():
+    if 'username' in session:
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = generate_password_hash(request.form['password'])
+
+        if username in users_db:
+            return "Username already exists. Go to <a href='/login'>Login</a>"
+
+        users_db[username] = password
+        return redirect(url_for('login'))
+
+    return render_template_string(register_page)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        stored_password = users_db.get(username)
+
+        if stored_password and check_password_hash(stored_password, password):
+            session['username'] = username
+            return redirect(url_for('dashboard'))
+        else:
+            return "Invalid credentials. Try again."
+
+    return render_template_string(login_page)
+
+@app.route('/dashboard')
+def dashboard():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    return render_template_string(dashboard_page, user=session['username'])
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    return redirect(url_for('login'))
+
+if __name__ == '__main__':
+    app.run(debug=True)
